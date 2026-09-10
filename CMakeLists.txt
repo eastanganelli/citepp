@@ -30,7 +30,13 @@ if(MINGW)
     target_link_libraries(app PRIVATE ole32 oleaut32 uuid version shlwapi advapi32 user32)
 endif()
 
-# Copy built React app (frontend/dist) next to the binary as ui/
-add_custom_command(TARGET app POST_BUILD
+# Copy the built React app (frontend/dist) next to the binary as ui/.
+# This is a target of its own rather than a POST_BUILD step on `app`: POST_BUILD
+# only fires when the executable itself relinks, so a frontend-only change would
+# silently leave a stale ui/ next to an up-to-date binary.
+add_custom_target(ui ALL
+    COMMAND ${CMAKE_COMMAND} -E rm -rf $<TARGET_FILE_DIR:app>/ui
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/frontend/dist $<TARGET_FILE_DIR:app>/ui)
+        ${CMAKE_SOURCE_DIR}/frontend/dist $<TARGET_FILE_DIR:app>/ui
+    COMMENT "Copying frontend/dist -> ui/")
+add_dependencies(ui app)

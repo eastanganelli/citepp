@@ -42,8 +42,10 @@ export default function App() {
 }
 
 const S: Record<string, React.CSSProperties> = {
+  // height (not minHeight) + overflowY keeps the page pinned to the window and
+  // scrolls the content inside it instead of growing the document.
   page: { fontFamily: "system-ui, sans-serif", background: "#0f1117",
-          color: "#e6e6e6", minHeight: "100vh", margin: 0, padding: 24,
+          color: "#e6e6e6", height: "100%", overflowY: "auto", padding: 24,
           display: "flex", flexDirection: "column", gap: 16, alignItems: "center" },
   h1: { fontSize: 20, margin: 0 },
   card: { background: "#171a23", border: "1px solid #262b38", borderRadius: 12,

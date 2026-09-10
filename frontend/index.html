@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>cpp-react-webview</title>
+    <style>
+      /* The webview gives the document the exact size of the window, so the
+         chain html > body > #root has to carry that height down to the app;
+         without it the page is only as tall as its content. body's default
+         8px margin is what leaves a light frame around the dark UI. */
+      html, body, #root { height: 100%; }
+      body { margin: 0; background: #0f1117; }
+      *, *::before, *::after { box-sizing: border-box; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

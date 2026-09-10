@@ -13,7 +13,64 @@
 
 #if defined(_WIN32)
   #include <windows.h>
+#elif defined(__APPLE__)
+  #include <mach-o/dyld.h>
+  #include <climits>
+#else
+  #include <unistd.h>
+  #include <climits>
 #endif
+
+// ---------------------------------------------------------------------------
+// Locating the UI on disk
+//
+// The webview can only load the bundle through a file:// URL, and that URL has
+// to be absolute: "file://ui/index.html" parses "ui" as the *host*, so the
+// platform webview goes looking for a network share and the window stays blank.
+// Resolving against the executable's own directory also means the app works no
+// matter what the current working directory is (double-clicked, unzipped
+// artifact, launched from a shortcut).
+// ---------------------------------------------------------------------------
+static std::string executable_dir() {
+#if defined(_WIN32)
+    wchar_t wbuf[MAX_PATH * 4];
+    DWORD n = GetModuleFileNameW(nullptr, wbuf, (DWORD)(sizeof(wbuf) / sizeof(wbuf[0])));
+    if (n == 0) return ".";
+    int len = WideCharToMultiByte(CP_UTF8, 0, wbuf, (int)n, nullptr, 0, nullptr, nullptr);
+    std::string path(len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wbuf, (int)n, &path[0], len, nullptr, nullptr);
+    for (char& c : path) if (c == '\\') c = '/';
+#elif defined(__APPLE__)
+    char buf[PATH_MAX];
+    uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) != 0) return ".";
+    std::string path(buf);
+#else
+    char buf[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n <= 0) return ".";
+    buf[n] = '\0';
+    std::string path(buf);
+#endif
+    auto slash = path.find_last_of('/');
+    return slash == std::string::npos ? std::string(".") : path.substr(0, slash);
+}
+
+// Percent-encode the characters that are not legal in a URL path, so paths
+// containing spaces or non-ASCII characters still resolve.
+static std::string to_file_url(const std::string& abs_path) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string out = "file://";
+    if (!abs_path.empty() && abs_path[0] != '/') out += '/';   // file:///C:/...
+    for (unsigned char c : abs_path) {
+        bool safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') || c == '/' || c == ':' ||
+                    c == '-' || c == '_' || c == '.' || c == '~';
+        if (safe) out += (char)c;
+        else { out += '%'; out += hex[c >> 4]; out += hex[c & 0xF]; }
+    }
+    return out;
+}
 
 // ---------------------------------------------------------------------------
 // Business logic (the work lives in C++)
@@ -78,7 +135,7 @@ int main() {
         return buf;
     });
 
-    w.navigate("file://" + std::string("ui/index.html"));
+    w.navigate(to_file_url(executable_dir() + "/ui/index.html"));
     w.run();
     return 0;
 }
